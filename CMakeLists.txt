@@ -1,48 +1,36 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.1O)
+
+SET(V_MAJ0R 1)
+SET(V_MINOR 0)
+SET(V_PATCH 0)
+SET(V_REVISION 1)
+
+project(my_project
+        VERSION ${V_MAJ0R}.${V_MINOR}.${V_PATCH}.${V_REVISION}
+        DESCRIPTION "My Project Description")
+
+if (NOT CMAKE_BUILD_TYPE)
+    message(WARNING "Build type not specified. Setting default ('Debug')")
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build." FORCE)
+endif ()
+
 set(CMAKE_CXX_STANDARD 11)
+set(ARCH "x64")
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules
+        CACHE STRING "CMake module path" FORCE)
 
-message(STATUS ${CMAKE_CXX_COMPILER})
+configure_file("${PROJECT_SOURCE_DIR}/version.hpp.in"
+        "${PROJECT_SOURCE_DIR}/version.hpp" @ONLY)
 
-# Nome del progetto
-project(rdb)
+add_compile_options("$<$<NOT:$<CONFIG:Debug>>:/Zi>")
+add_link_options("$<$<NOT:$<CONFIG:Debug>>:/DEBUG>")
+add_link_options("$<$<NOT:$<CONFIG:Debug>>:/OPT:REF>")
+add_link_options("$<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>")
 
-# Aggiunge tutte le directory necessarie
-set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
-set(INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include")
-set(LIB_DIR "${CMAKE_SOURCE_DIR}/lib")
-set(ASSETS_DIR "${CMAKE_SOURCE_DIR}/assets")
-set(BIN_DIR "${CMAKE_SOURCE_DIR}/bin")
-set(BUILD_DIR "${CMAKE_BINARY_DIR}")
+include_directories(${PROJECT_SOURCE_DIR})
 
-if (DEBUG_MODE OR CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_BUILD_TYPE Debug)
-    set(CMAKE_CXX_FLAGS_DEBUG "-g")
-    set(TARGET_NAME "${PROJECT_NAME}_d")
-else()
-    set(CMAKE_BUILD_TYPE Release)
-    set(TARGET_NAME ${PROJECT_NAME})
-endif()
+# link_directories(${LIB_DIR})
 
-# Imposta il percorso delle librerie esterne
-link_directories(${LIB_DIR})
 
-# Includi i file header
-include_directories(${INCLUDE_DIR})
-
-# Aggiungi i file sorgenti
-file(GLOB_RECURSE SOURCES "${SRC_DIR}/*.cpp")
-
-# Aggiunge il target eseguibile
-add_executable(${TARGET_NAME} ${SOURCES})
-# add_library(${TARGET_NAME} SHARED ${SOURCES})
-# add_library(${TARGET_NAME} STATIC ${SOURCES})
-
-# Linka le librerie esterne se necessario
-# target_link_libraries(${TARGET_NAME} libname)
-
-# Imposta le directory di output
-set_target_properties(${TARGET_NAME} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR}
-    LIBRARY_OUTPUT_DIRECTORY ${BIN_DIR}
-    ARCHIVE_OUTPUT_DIRECTORY ${BIN_DIR}
-)
+include(cmake_module_name)
+add_subdirectory(src)

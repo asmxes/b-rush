@@ -1,0 +1,13 @@
+#ifndef PROJECT_VERSION_HPP
+#define PROJECT_VERSION_HPP
+
+
+#define V_MAJOR @V_MAJ0R@
+#define V_MINOR @V_MINOR@
+#define V_PATCH @V_PATCH@
+#define V_REVISION @V_REVISION@
+
+#define PROJECT_VERSION \
+  V_MAJOR##.##V_MINOR##.##V_PATCH##.##V_REISION
+
+#endif

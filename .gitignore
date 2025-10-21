@@ -1,2 +1,6 @@
-/bin/*
-/build/*
+/.vs*
+/.vscode
+/.idea
+/version.hpp
+
+/cmake-build*
