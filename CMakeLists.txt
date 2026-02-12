@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.1O)
+cmake_minimum_required(VERSION 4.0)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake-modules")
+include(Sign)
 
 SET(V_MAJ0R 1)
 SET(V_MINOR 0)
@@ -27,10 +30,24 @@ add_link_options("$<$<NOT:$<CONFIG:Debug>>:/DEBUG>")
 add_link_options("$<$<NOT:$<CONFIG:Debug>>:/OPT:REF>")
 add_link_options("$<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>")
 
-include_directories(${PROJECT_SOURCE_DIR})
+include_directories(
+        ${PROJECT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/deps
+        "C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Include"
+        "C:\\Users\\ry\\source\\repos\\vcpkg\\installed\\x64-windows\\include"
+)
 
-# link_directories(${LIB_DIR})
+link_directories(
+        ${LIB_DIR}
+        "C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Lib\\x64"
+        "C:\\Users\\ry\\source\\repos\\vcpkg\\installed\\x64-windows\\lib"
+)
 
 
-include(cmake_module_name)
-add_subdirectory(src)
+#include(cmake_module_name)
+add_subdirectory(deps/imgui)
+
+add_subdirectory(chalk-dispatcher)
+add_subdirectory(chalkboard)
+add_subdirectory(injector)
+#add_subdirectory(loader)

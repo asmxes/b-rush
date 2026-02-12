@@ -1,7 +1,9 @@
-set(TARGET_NAME target)
+set(TARGET_NAME chalk-dispatcher)
 
 
-add_executable(${TARGET_NAME} ${SOURCES})
+add_executable(${TARGET_NAME} main.cpp)
+sign_executable(${TARGET_NAME})
+
 # add_library(${TARGET_NAME} SHARED ${SOURCES})
 # add_library(${TARGET_NAME} STATIC ${SOURCES})
 
