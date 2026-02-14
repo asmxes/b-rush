@@ -18,5 +18,5 @@ sign_executable(${TARGET_NAME})
 #include_directories(${INCLUDE_DIR})
 target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(${TARGET_NAME} PRIVATE imgui)
+target_link_libraries(${TARGET_NAME} PRIVATE imgui cpr::cpr nlohmann_json::nlohmann_json)
 target_compile_options(${TARGET_NAME} PRIVATE /wd4005)

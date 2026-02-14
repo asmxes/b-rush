@@ -22,6 +22,15 @@ set(ARCH "x64")
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules
         CACHE STRING "CMake module path" FORCE)
 
+set(CPR_CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
+include(FetchContent)
+FetchContent_Declare(cpr GIT_REPOSITORY https://github.com/libcpr/cpr.git
+        GIT_TAG 1.14.1) # Replace with your desired git commit from: https://github.com/libcpr/cpr/releases
+FetchContent_MakeAvailable(cpr)
+
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
+
 configure_file("${PROJECT_SOURCE_DIR}/version.hpp.in"
         "${PROJECT_SOURCE_DIR}/version.hpp" @ONLY)
 
@@ -32,7 +41,7 @@ add_link_options("$<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>")
 
 include_directories(
         ${PROJECT_SOURCE_DIR}
-        ${PROJECT_SOURCE_DIR}/deps
+        ${PROJECT_SOURCE_DIR}/shared
         "C:\\Program Files (x86)\\Microsoft DirectX SDK (June 2010)\\Include"
         "C:\\Users\\ry\\source\\repos\\vcpkg\\installed\\x64-windows\\include"
 )
@@ -43,9 +52,8 @@ link_directories(
         "C:\\Users\\ry\\source\\repos\\vcpkg\\installed\\x64-windows\\lib"
 )
 
-
 #include(cmake_module_name)
-add_subdirectory(deps/imgui)
+add_subdirectory(imgui)
 
 add_subdirectory(server)
 add_subdirectory(chalkboard)

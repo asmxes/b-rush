@@ -46,7 +46,7 @@ void
 entry ()
 {
   logger::get ()->open (R"(C:\Users\ry\Desktop)", logger::level::kTRACE);
-  INFO ("Chalkboard V" PROJECT_VERSION_STR " started");
+  INFO ("Chalkboard v" PROJECT_VERSION_STR " started");
 
   if (!thread ())
     MessageBoxA (NULL,

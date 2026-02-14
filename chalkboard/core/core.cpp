@@ -124,9 +124,6 @@ core::render_menu ()
 void
 core::wnd_proc (UINT msg, WPARAM wparam, LPARAM lParam)
 {
-  // TRACE ("DX11 WNDPROC called, msg: " + std::to_string (msg) + ", wparam: "
-  // + std::to_string (wparam) + ", lparam: " + std::to_string (lParam));
-
   if (msg == WM_KEYDOWN)
     {
       switch (wparam)

@@ -6,6 +6,7 @@
 
 #include "color.hpp"
 #include "imgui/imgui.h"
+
 namespace overlay {
 namespace draw {
 void
