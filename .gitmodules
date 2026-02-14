@@ -1,6 +1,0 @@
-[submodule "include/ry"]
-	path = include/ry
-	url = https://github.com/asmxes/ry.git
-[submodule "deps/ry"]
-	path = deps/ry
-	url = git@github.com:asmxes/ry.git

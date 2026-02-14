@@ -1,5 +1,4 @@
-#include "overlay.hpp"
-// #include <d3d11.h>
+#include "hook.hpp"
 #include <d3dx11.h>
 #pragma comment(lib, "d3d11.lib")
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -7,14 +6,23 @@
 #include "imgui/imgui_impl_dx11.h"
 #include "imgui/imgui_impl_win32.h"
 
+#include "overlay/draw/draw.hpp"
+#include "utility/logger/logger.hpp"
+#include "utility/event/event.hpp"
+
+#include <chrono>
+#include <thread>
+
 extern IMGUI_IMPL_API LRESULT
 ImGui_ImplWin32_WndProcHandler (HWND hWnd, UINT msg, WPARAM wParam,
 				LPARAM lParam);
 
+namespace overlay {
+
 void
-hook ();
+hook_impl ();
 void
-unhook ();
+unhook_impl ();
 
 typedef HRESULT (__stdcall *present_fn) (IDXGISwapChain *, UINT, UINT);
 typedef HRESULT (__stdcall *resize_fn) (IDXGISwapChain *, UINT, UINT, UINT,
@@ -54,6 +62,7 @@ create_render_target (IDXGISwapChain *swap_chain)
   d3d_device->CreateRenderTargetView (pBackBuffer, nullptr,
 				      &render_target_view);
   pBackBuffer->Release ();
+  INFO ("Created RenderTarget object");
 }
 
 void
@@ -63,27 +72,45 @@ cleanup_render_target ()
     {
       render_target_view->Release ();
       render_target_view = nullptr;
+      WARNING ("Cleaned RenderTarget object");
     }
 }
 
 LRESULT CALLBACK
 wnd_proc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-  if (wparam == VK_DELETE)
+  // TRACE ("DX11 WNDPROC called, msg: " + std::to_string (msg) + ", wparam: "
+  // + std::to_string (wparam) + ", lparam: " + std::to_string (lparam));
+
+  if (wparam == VK_SHIFT)
     {
       quit_requested = true;
     }
   // TODO: respond to injector challenge
 
-  // TODO: publish event for keypresses
+  PUBLISH (utility::event::id::wnd_proc, msg, wparam, lparam);
+
+  // if (inst->wants_input ())
+  //   return true;
+
   if (ImGui_ImplWin32_WndProcHandler (hwnd, msg, wparam, lparam))
     return true;
   return CallWindowProc (o_wnd_proc, hwnd, msg, wparam, lparam);
 }
 
+void
+push_imgui_styles ()
+{
+  ImGui::GetIO ().LogFilename = nullptr;
+  ImGui::GetIO ().IniFilename = nullptr;
+  ImGui::GetIO ().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+}
+
 HRESULT __stdcall
 hk_present (IDXGISwapChain *swap_chain, UINT sync_internal, UINT flags)
 {
+  // return o_present (swap_chain, sync_internal, flags);
+
   if (!imgui_init)
     {
       swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
@@ -101,9 +128,10 @@ hk_present (IDXGISwapChain *swap_chain, UINT sync_internal, UINT flags)
       ImGui_ImplDX11_Init (d3d_device, d3d_context);
       create_render_target (swap_chain);
 
-      // push_imgui_styles ();
+      push_imgui_styles ();
 
       imgui_init = true;
+      INFO ("Created ImGui context");
     }
 
   {
@@ -119,9 +147,13 @@ hk_present (IDXGISwapChain *swap_chain, UINT sync_internal, UINT flags)
 		    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground
 		      | ImGuiWindowFlags_NoSavedSettings
 		      | ImGuiWindowFlags_NoInputs);
-      RY_PUBLISH ("render", nullptr);
-      RY_PUBLISH ("render_menu", nullptr);
-      ImGui::ShowDemoWindow ();
+
+      // draw::line ({0, 0}, {200, 200}, 40.f, color ("#ff23ffff"));
+
+      PUBLISH (utility::event::id::render, sync_internal);
+      PUBLISH (utility::event::id::render_menu, sync_internal);
+
+      // ImGui::ShowDemoWindow ();
 
       ImGui::End ();
     }
@@ -135,7 +167,7 @@ hk_present (IDXGISwapChain *swap_chain, UINT sync_internal, UINT flags)
 
   if (quit_requested)
     {
-      unhook ();
+      unhook_impl ();
       can_quit = true;
     }
 
@@ -146,6 +178,10 @@ HRESULT __stdcall
 hk_resize (IDXGISwapChain *swap_chain, UINT buffer_count, UINT w, UINT h,
 	   DXGI_FORMAT new_format, UINT flags)
 {
+  TRACE ("DX11 Resize called, {}:{}, flags {} ", w, h, flags);
+
+  // return o_resize (swap_chain, buffer_count, w, h, new_format, flags);
+
   if (imgui_init)
     {
       cleanup_render_target ();
@@ -159,7 +195,7 @@ hk_resize (IDXGISwapChain *swap_chain, UINT buffer_count, UINT w, UINT h,
 }
 
 void
-hook ()
+hook_impl ()
 {
   if (is_hooked)
     return;
@@ -168,7 +204,8 @@ hook ()
   scd.BufferCount = 1;
   scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
   scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-  scd.OutputWindow = GetForegroundWindow (); // Replace if needed
+  scd.OutputWindow = FindWindow ("VALORANTUnrealWindow",
+				 "VALORANT  "); // Replace if needed
   scd.SampleDesc.Count = 1;
   scd.Windowed = TRUE;
   scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
@@ -178,9 +215,23 @@ hook ()
   IDXGISwapChain *swap_chain = nullptr;
 
   D3D_FEATURE_LEVEL featureLevel;
-  D3D11CreateDeviceAndSwapChain (nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
-				 nullptr, 0, D3D11_SDK_VERSION, &scd,
-				 &swap_chain, &device, &featureLevel, &context);
+  for (auto i = 0; i < 5; i++)
+    {
+      HRESULT result
+	= D3D11CreateDeviceAndSwapChain (nullptr, D3D_DRIVER_TYPE_HARDWARE,
+					 nullptr, 0, nullptr, 0,
+					 D3D11_SDK_VERSION, &scd, &swap_chain,
+					 &device, &featureLevel, &context);
+
+      if (SUCCEEDED (result))
+	break;
+
+      WARNING ("Failed to create dummy device and swapchain, returned: {}",
+	       result);
+      std::this_thread::sleep_for (std::chrono::seconds (1));
+    }
+  if (!swap_chain)
+    return;
 
   swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
   hook_vtable (static_cast<void **> (swapchain_vtable), 8,
@@ -194,56 +245,80 @@ hook ()
   device->Release ();
   context->Release ();
   is_hooked = true;
+
+  INFO ("Hooked PresentScene and ResizeBuffers DX11 virtual functions");
 }
 
 void
-unhook ()
+unhook_impl ()
 {
   if (!is_hooked)
     return;
-
-  if (imgui_init)
-    {
-      ImGui_ImplDX11_Shutdown ();
-      ImGui_ImplWin32_Shutdown ();
-      ImGui::DestroyContext ();
-      cleanup_render_target ();
-      SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) o_wnd_proc);
-
-      imgui_init = false;
-    }
 
   hook_vtable (static_cast<void **> (swapchain_vtable), 8,
 	       reinterpret_cast<void *> (o_present), nullptr);
   hook_vtable (static_cast<void **> (swapchain_vtable), 13,
 	       reinterpret_cast<void *> (o_resize), nullptr);
+
+  if (imgui_init)
+    {
+      SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) o_wnd_proc);
+
+      cleanup_render_target ();
+
+      ImGui_ImplDX11_Shutdown ();
+      ImGui_ImplWin32_Shutdown ();
+      ImGui::DestroyContext ();
+
+      if (d3d_device)
+	{
+	  d3d_device->Release ();
+	  d3d_device = nullptr;
+	}
+      if (d3d_context)
+	{
+	  d3d_context->ClearState ();
+	  d3d_context->Flush ();
+	  d3d_context->Release ();
+	  d3d_context = nullptr;
+	}
+      imgui_init = false;
+      INFO ("UnInitialized ImGui and DirectX objects");
+    }
+
   is_hooked = false;
+  INFO ("UnHooked PresentScene and ResizeBuffers DX11 virtual functions");
 }
 
-std::string
-overlay::get_name ()
+HWND
+hook::get_hwnd ()
 {
-  return "Chalkboard Overlay Module DX11";
+  return hwnd;
 }
 
-void
-overlay::start ()
+bool
+hook::is_rendering ()
 {
-  hook ();
-};
-
-void
-overlay::update () {};
-
-void
-overlay::stop ()
-{
-  unhook ();
-};
-
-overlay *
-overlay::get ()
-{
-  static overlay object{};
-  return &object;
+  return !can_quit;
 }
+
+hook::hook ()
+{
+  INFO ("Starting overlay");
+  hook_impl ();
+}
+
+hook::~hook ()
+{
+  INFO ("Unhooking and destroying overlay");
+  unhook_impl ();
+}
+
+hook *
+hook::get ()
+{
+  static hook instance;
+  return &instance;
+}
+
+} // namespace overlay

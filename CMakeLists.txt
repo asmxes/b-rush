@@ -8,7 +8,7 @@ SET(V_MINOR 0)
 SET(V_PATCH 0)
 SET(V_REVISION 1)
 
-project(my_project
+project(b-rush
         VERSION ${V_MAJ0R}.${V_MINOR}.${V_PATCH}.${V_REVISION}
         DESCRIPTION "My Project Description")
 
@@ -17,7 +17,7 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build." FORCE)
 endif ()
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 set(ARCH "x64")
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules
         CACHE STRING "CMake module path" FORCE)
@@ -47,7 +47,7 @@ link_directories(
 #include(cmake_module_name)
 add_subdirectory(deps/imgui)
 
-add_subdirectory(chalk-dispatcher)
+add_subdirectory(server)
 add_subdirectory(chalkboard)
 add_subdirectory(injector)
 #add_subdirectory(loader)

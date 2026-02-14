@@ -1,4 +1,4 @@
-set(TARGET_NAME chalk-dispatcher)
+set(TARGET_NAME server)
 
 
 add_executable(${TARGET_NAME} main.cpp)

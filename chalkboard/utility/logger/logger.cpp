@@ -1,19 +1,7 @@
 #include "logger.hpp"
 #include <Windows.h>
 
-logger *
-logger::get ()
-{
-  static logger obj;
-  return &obj;
-}
-
-void
-logger::configure (const std::string &dir, logger::level lvl)
-{
-  this->_stream.open (logger::make_filename (dir), std::ios::app);
-  this->_lvl = lvl;
-}
+logger::~logger () { this->close (); }
 
 void
 logger::print (logger::level lvl, const char *func, std::string content)
@@ -23,12 +11,41 @@ logger::print (logger::level lvl, const char *func, std::string content)
 
   if (!this->_stream.is_open ())
     {
-      MessageBoxA (NULL, "Could not open file", "Chalkboard", MB_OK);
+      MessageBoxA (NULL, "Could not open logging file", "Chalkboard",
+		   MB_OK | MB_ICONERROR);
       return;
     }
 
-  this->_stream << "[" << level_char (lvl) << "] [" << func << "] ["
-		<< time_stamp () << "] " << content << std::endl;
+  this->_stream << "[" << level_char (lvl) << "] [" << time_stamp () << "] ["
+		<< func << "] " << content << std::endl;
+}
+
+void
+logger::open (const std::string &dir, level lvl)
+{
+  this->_path = make_filename (dir);
+  this->_stream.open (this->_path, std::ios::app);
+  this->_lvl = lvl;
+}
+void
+logger::close ()
+{
+  INFO ("Closing logging output");
+  if (this->_stream.is_open ())
+    this->_stream.close ();
+}
+
+const std::string &
+logger::get_path () const
+{
+  return this->_path;
+}
+
+logger *
+logger::get ()
+{
+  static logger object{};
+  return &object;
 }
 
 std::string
@@ -41,8 +58,6 @@ logger::make_filename (const std::string &dir)
   snprintf (buf, sizeof (buf), "chalkboard-%02d%02d%02d.log", st.wDay,
 	    st.wMonth, st.wYear % 100);
 
-  MessageBoxA (NULL, std::string (dir + "\\" + buf).c_str (), "Chalkboard",
-	       MB_OK);
   return dir + "\\" + buf;
 }
 
