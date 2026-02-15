@@ -9,7 +9,7 @@ namespace utility {
 namespace input {
 
 bool
-is_mouse_down (int button = VK_LBUTTON);
+is_key_down (int button = VK_LBUTTON);
 
 ImVec2
 get_mouse_pos (HWND hwnd);

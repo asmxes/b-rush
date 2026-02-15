@@ -18,14 +18,24 @@ namespace core {
 typedef std::vector<ImVec2> segment;
 std::vector<segment> _segments{};
 
+struct peer
+{
+  overlay::color color;
+  std::vector<segment> segments;
+};
+
+std::mutex _peers_mutex{};
+std::map<std::string, peer> _peers{};
+
 bool _should_render{};
 bool _draw_mode{};
 bool _mouse_down{};
 std::string _match_id{};
 
-float _smooth{8};
+float _smooth{4};
 float _thickness{4};
 float _colorf[4]{1, 1, 1, 1};
+overlay::color _color{};
 ImVec2 _start{-0.131, -0.42}, end{-0.108, -0.41};
 float _offsets[]{0, -0.034, -0.069, -0.1025, -0.137};
 
@@ -43,7 +53,7 @@ on_render ()
 	{
 	  auto pos = utility::input::get_mouse_pos (overlay::hook::get_hwnd ());
 
-	  if (utility::input::is_mouse_down (VK_RBUTTON))
+	  if (utility::input::is_key_down (VK_RBUTTON))
 	    {
 	      auto &io = ImGui::GetIO ();
 
@@ -52,18 +62,22 @@ on_render ()
 		  _mouse_down = true;
 		  _segments.emplace_back ();
 		  auto norm = overlay::utility::screen_to_normalized (pos);
+		  // ue::unrotate(norm)
 		  _segments.back ().push_back (norm);
 		  api::ws::send_start_draw (norm);
 		}
 	      else if (!_segments.empty () && !_segments.back ().empty ())
 		{
 		  auto norm = overlay::utility::screen_to_normalized (pos);
+		  // ue::unrotate(norm)
 		  auto &last = _segments.back ().back ();
 		  float dx = (norm.x - last.x) * io.DisplaySize.x;
 		  float dy = (norm.y - last.y) * io.DisplaySize.y;
 		  if (dx * dx + dy * dy >= 25.0f)
-		    _segments.back ().push_back (norm);
-		  api::ws::send_add_point (norm);
+		    {
+		      _segments.back ().push_back (norm);
+		      api::ws::send_add_point (norm);
+		    }
 		}
 	    }
 	  else
@@ -79,6 +93,7 @@ on_render ()
 
   if (_should_render)
     {
+      // Own segments
       for (auto &seg : _segments)
 	{
 	  if (seg.size () < 2)
@@ -87,25 +102,44 @@ on_render ()
 	  std::vector<ImVec2> screen_points;
 	  screen_points.reserve (seg.size ());
 	  for (const auto &p : seg)
+	    // ue::rotate(p)
 	    screen_points.push_back (
 	      overlay::utility::normalized_to_screen (p));
 
-	  overlay::draw::path (screen_points, _smooth, _thickness,
-			       overlay::color (_colorf[0], _colorf[1],
-					       _colorf[2], _colorf[3]));
+	  overlay::draw::path (screen_points, _smooth, _thickness, _color);
+	}
+
+      // Teammates segments
+      std::lock_guard<std::mutex> lk (_peers_mutex);
+      for (const auto &[guid, p] : _peers)
+	{
+	  for (const auto &seg : p.segments)
+	    {
+	      if (seg.size () < 2)
+		continue;
+
+	      std::vector<ImVec2> screen_points;
+	      screen_points.reserve (seg.size ());
+	      for (const auto &pt : seg)
+		// ue::rotate(p)
+		screen_points.push_back (
+		  overlay::utility::normalized_to_screen (pt));
+
+	      overlay::draw::path (screen_points, _smooth, _thickness, p.color);
+	    }
 	}
 
       // Convert to screen for drawing
-      for (int i = 0; i < ARRAYSIZE (_offsets); i++)
-	{
-	  ImVec2 start_screen = overlay::utility::normalized_to_screen (
-	    {_start.x + _offsets[i], _start.y});
-	  ImVec2 end_screen = overlay::utility::normalized_to_screen (
-	    {end.x + _offsets[i], end.y});
-	  overlay::draw::rectangle (start_screen, end_screen, true,
-				    overlay::color (_colorf[0], _colorf[1],
-						    _colorf[2], _colorf[3]));
-	}
+      //      for (int i = 0; i < ARRAYSIZE (_offsets); i++)
+      // {
+      //   ImVec2 start_screen = overlay::utility::normalized_to_screen (
+      //     {_start.x + _offsets[i], _start.y});
+      //   ImVec2 end_screen = overlay::utility::normalized_to_screen (
+      //     {end.x + _offsets[i], end.y});
+      //   overlay::draw::rectangle (start_screen, end_screen, true,
+      // 			    overlay::color (_colorf[0], _colorf[1],
+      // 					    _colorf[2], _colorf[3]));
+      // }
     }
 }
 
@@ -138,9 +172,20 @@ on_wnd_proc (UINT msg, WPARAM wparam, LPARAM lParam)
 	case 'E':
 	  if (_should_render)
 	    {
-	      if (!_segments.empty ())
-		_segments.clear ();
-	      api::ws::send_erase ();
+	      if (utility::input::is_key_down (VK_LCONTROL))
+		{
+		  std::lock_guard<std::mutex> lk (_peers_mutex);
+		  for (auto &peer : _peers)
+		    {
+		      peer.second.segments.clear ();
+		    }
+		}
+	      else
+		{
+		  if (!_segments.empty ())
+		    _segments.clear ();
+		  api::ws::send_erase ();
+		}
 	    }
 	  break;
 	default:
@@ -185,24 +230,61 @@ on_update ()
 	}
     }
 
-  // TODO: send ws command for new segments
+  // TODO: send ws command for new segments (? to be cheked because right now it
+  // works fine on_draw)
+  // TODO: ue::round_has_restarted() check
 }
 
 void
 handle_joined (nlohmann::json *json)
-{}
+{
+  auto c = (*json)["color"];
+  _color = overlay::color (c[0].get<u8> (), c[1].get<u8> (), c[2].get<u8> (),
+			   c[3].get<u8> ());
+}
 
 void
 handle_peer_joined (nlohmann::json *json)
-{}
+{
+  auto guid = (*json)["guid"].get<std::string> ();
+  auto c = (*json)["color"];
+  auto color = overlay::color (c[0].get<u8> (), c[1].get<u8> (),
+			       c[2].get<u8> (), c[3].get<u8> ());
+
+  std::lock_guard<std::mutex> lk (_peers_mutex);
+  _peers[guid].color = color;
+}
 
 void
 handle_start_draw (nlohmann::json *json)
-{}
+{
+  auto guid = (*json)["guid"].get<std::string> ();
+  float x = (*json)["x"].get<float> ();
+  float y = (*json)["y"].get<float> ();
+
+  std::lock_guard<std::mutex> lk (_peers_mutex);
+  if (!_peers.contains (guid))
+    return;
+
+  _peers[guid].segments.emplace_back ();
+  _peers[guid].segments.back ().push_back ({x, y});
+}
 
 void
 handle_add_point (nlohmann::json *json)
-{}
+{
+  auto guid = (*json)["guid"].get<std::string> ();
+  float x = (*json)["x"].get<float> ();
+  float y = (*json)["y"].get<float> ();
+
+  std::lock_guard<std::mutex> lk (_peers_mutex);
+  if (!_peers.contains (guid))
+    return;
+
+  auto &segs = _peers[guid].segments;
+  if (!segs.empty ())
+    segs.back ().push_back ({x, y});
+}
 
 void
 handle_end_draw (nlohmann::json *json)
@@ -210,12 +292,49 @@ handle_end_draw (nlohmann::json *json)
 
 void
 handle_erase (nlohmann::json *json)
-{}
+{
+  auto guid = (*json)["guid"].get<std::string> ();
+
+  std::lock_guard<std::mutex> lk (_peers_mutex);
+  if (_peers.contains (guid))
+    _peers[guid].segments.clear ();
+}
+
+void
+handle_peer_left (nlohmann::json *json)
+{
+  auto guid = (*json)["guid"].get<std::string> ();
+
+  std::lock_guard<std::mutex> lk (_peers_mutex);
+  _peers.erase (guid);
+}
 
 void
 on_ws_data (nlohmann::json *json)
 {
-  INFO ("{}", json->dump ());
+  try
+    {
+      auto type = (*json)["type"].get<std::string> ();
+
+      if (type == "joined")
+	handle_joined (json);
+      else if (type == "peer_joined")
+	handle_peer_joined (json);
+      else if (type == "start_draw")
+	handle_start_draw (json);
+      else if (type == "add_point")
+	handle_add_point (json);
+      else if (type == "end_draw")
+	handle_end_draw (json);
+      else if (type == "erase")
+	handle_erase (json);
+      else if (type == "peer_left")
+	handle_peer_left (json);
+    }
+  catch (std::exception &e)
+    {
+      WARNING ("Exception thrown: {}", e.what ());
+    }
 }
 
 bool

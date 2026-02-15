@@ -36,7 +36,7 @@ get_current_valorant_version ()
       ERROR ("Get on '{}' returned: {}, with message: {}, content: {}",
 	     "https://valorant-api.com/v1/version",
 	     static_cast<int> (req.error.code), req.error.message, req.text);
-      return "";
+      return {};
     }
 
   auto parsed_json = nlohmann::json::parse (req.text);
@@ -66,7 +66,7 @@ get_region ()
 	ERROR ("Get on '{}' returned: {}, with message: {}, content: {}",
 	       "/product-session/v1/external-sessions",
 	       static_cast<int> (req.error.code), req.error.message, req.text);
-	return "";
+	return {};
       }
     }
 
@@ -83,14 +83,13 @@ get_region ()
 	  if (s.starts_with (prefix))
 	    {
 	      return s.substr (prefix.size ());
-	      break;
 	    }
 	}
       break;
     }
 
   WARNING ("No suitable key found");
-  return "";
+  return {};
 }
 
 bool
@@ -158,7 +157,7 @@ std::string
 get_riot_id ()
 {
   if (!_is_valid)
-    return "";
+    return {};
 
   auto url
     = std::string (_local_url).append (R"(/riot-client-auth/v1/userinfo)");
@@ -170,14 +169,14 @@ get_riot_id ()
     {
       ERROR ("Get on '{}' returned: {}, with message: {}, content: {}", url,
 	     static_cast<int> (req.error.code), req.error.message, req.text);
-      return "";
+      return {};
     }
 
   const auto parsed_json = nlohmann::json::parse (req.text);
   if (!parsed_json.contains ("acct"))
     {
       ERROR ("Could not find acct key: {}", req.text);
-      return "";
+      return {};
     }
 
   auto username = parsed_json.at ("acct").at ("game_name").get<std::string> ();
@@ -245,18 +244,18 @@ get_match_guid ()
   if (match_data.empty ())
     {
       DEBUG ("No match data");
-      return "";
+      return {};
     }
 
   if (!match_data.contains ("MatchID") || !match_data.contains ("State"))
     {
       DEBUG ("Could not find MatchID or State keys: {}", match_data.dump ());
-      return "";
+      return {};
     }
 
   auto state = match_data.at ("State").get<std::string> ();
   if (state != "IN_PROGRESS")
-    return "";
+    return {};
 
   auto id = match_data.at ("MatchID").get<std::string> ();
   return id;
@@ -269,7 +268,7 @@ get_team ()
   if (match_data.empty ())
     {
       DEBUG ("No match data");
-      return "";
+      return {};
     }
 
   std::string team_id{};

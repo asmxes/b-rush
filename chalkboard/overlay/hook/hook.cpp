@@ -78,11 +78,18 @@ cleanup_render_target ()
 LRESULT CALLBACK
 wnd_proc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-  if (wparam == VK_DELETE)
+  if (msg == WM_KEYDOWN && wparam == VK_DELETE)
     {
       INFO ("Quit request by user");
       _quit_requested = true;
     }
+
+  if (msg == WM_DESTROY || msg == WM_CLOSE)
+    {
+      INFO ("Window closing, quit requested");
+      _quit_requested = true;
+    }
+
   // TODO: respond to injector challenge
 
   PUBLISH (utility::event::id::wnd_proc, msg, wparam, lparam);

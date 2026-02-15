@@ -11,9 +11,34 @@ GUID = "viewer-" + str(id(object()))
 BG_COLOR = (20, 20, 30)
 GRID_COLOR = (40, 40, 50)
 
-# peer_guid -> { "color": (r,g,b,a), "segments": [[(x,y), ...], ...] }
 peers: dict[str, dict] = {}
 lock = threading.Lock()
+
+my_segments: list[list[tuple]] = []
+my_drawing = False
+
+ws_ref = None
+send_queue: list[str] = []
+send_lock = threading.Lock()
+
+
+def queue_send(msg: dict):
+    with send_lock:
+        send_queue.append(json.dumps(msg))
+
+
+def screen_to_normalized(sx, sy, w, h):
+    return (
+        (sx - w * 0.5) / w,
+        (sy - h * 0.5) / h
+    )
+
+
+def normalized_to_screen(nx, ny, w, h):
+    return (
+        int(nx * w + w * 0.5),
+        int(ny * h + h * 0.5)
+    )
 
 
 async def ws_client():
@@ -26,7 +51,17 @@ async def ws_client():
             "guid": GUID
         }))
 
-        async for raw in ws:
+        while True:
+            # send queued messages
+            with send_lock:
+                while send_queue:
+                    await ws.send(send_queue.pop(0))
+
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=0.01)
+            except asyncio.TimeoutError:
+                continue
+
             msg = json.loads(raw)
 
             with lock:
@@ -78,14 +113,9 @@ async def ws_client():
                     peers.pop(guid, None)
 
 
-def normalized_to_screen(nx, ny, w, h):
-    return (
-        int(nx * w + w * 0.5),
-        int(ny * h + h * 0.5)
-    )
-
-
 def main():
+    global my_drawing
+
     pygame.init()
     screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
     pygame.display.set_caption(f"Viewer - {ROOM}")
@@ -104,8 +134,33 @@ def main():
                 running = False
             elif event.type == pygame.VIDEORESIZE:
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_e:
+                    my_segments.clear()
+                    queue_send({"type": "erase"})
 
         w, h = screen.get_size()
+        mx, my = pygame.mouse.get_pos()
+        nx, ny = screen_to_normalized(mx, my, w, h)
+
+        if pygame.mouse.get_pressed()[0]:
+            if not my_drawing:
+                my_drawing = True
+                my_segments.append([(nx, ny)])
+                queue_send({"type": "start_draw", "x": nx, "y": ny})
+            else:
+                if my_segments and my_segments[-1]:
+                    lx, ly = my_segments[-1][-1]
+                    dx = (nx - lx) * w
+                    dy = (ny - ly) * h
+                    if dx * dx + dy * dy >= 25.0:
+                        my_segments[-1].append((nx, ny))
+                        queue_send({"type": "add_point", "x": nx, "y": ny})
+        else:
+            if my_drawing:
+                my_drawing = False
+                queue_send({"type": "end_draw"})
+
         screen.fill(BG_COLOR)
 
         for x in range(0, w, 50):
@@ -117,6 +172,16 @@ def main():
         pygame.draw.line(screen, (60, 60, 70), (cx - 20, cy), (cx + 20, cy))
         pygame.draw.line(screen, (60, 60, 70), (cx, cy - 20), (cx, cy + 20))
 
+        # draw own segments (white)
+        for segment in my_segments:
+            if len(segment) < 2:
+                continue
+            screen_points = [
+                normalized_to_screen(p[0], p[1], w, h) for p in segment
+            ]
+            pygame.draw.lines(screen, (255, 255, 255), False, screen_points, 3)
+
+        # draw peer segments
         with lock:
             for guid, peer in peers.items():
                 color = peer["color"]
@@ -130,6 +195,7 @@ def main():
                     pygame.draw.circle(screen, color, screen_points[0], 4)
                     pygame.draw.circle(screen, color, screen_points[-1], 4)
 
+        # draw peer list
         with lock:
             y_off = 10
             for guid, peer in peers.items():

@@ -3,7 +3,7 @@
 namespace utility {
 namespace input {
 bool
-is_mouse_down (int button)
+is_key_down (int button)
 {
   return GetAsyncKeyState (button) & 0x8000;
 }
