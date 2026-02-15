@@ -2,6 +2,7 @@
 #define CHALKBOARD_CORE_HPP
 #include <Windows.h>
 #include <vector>
+#include <string>
 #include "imgui/imgui.h"
 
 class core
@@ -12,15 +13,18 @@ class core
   bool _should_render;
   bool _draw_mode;
   bool _mouse_down;
+  std::string _match_id;
 
-  virtual void render ();
-  virtual void render_menu ();
-  virtual void wnd_proc (UINT msg, WPARAM wParam, LPARAM lParam);
+  // TODO: Add on data callback
+  void update ();
+  void render ();
+  void render_menu ();
+  void wnd_proc (UINT msg, WPARAM wParam, LPARAM lParam);
 
 public:
   core ();
-  virtual bool wants_input ();
-  virtual ~core ();
+  bool wants_input ();
+  ~core ();
 };
 
 #endif

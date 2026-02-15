@@ -2,10 +2,13 @@
 #include <thread>
 
 #include "version.hpp"
+#include "api/riot/client.hpp"
 
 #include "utility/logger/logger.hpp"
 #include "core/core.hpp"
 #include "overlay/hook/hook.hpp"
+#include "utility/event/event.hpp"
+#include "api/ws/client.hpp"
 
 std::thread loop_thread;
 HMODULE chalkboard_handle;
@@ -15,11 +18,18 @@ execute ()
 {
   MessageBoxA (NULL, "Hi", "Chalkboard", MB_OK);
 
-  auto core_instance = core ();
+  INFO ("Logged in as: {}, GUID: {}", api::riot::client::get ()->get_riot_id (),
+	api::riot::client::get ()->get_player_guid ());
 
+  auto core_instance = core ();
   while (overlay::hook::get ()->is_rendering ())
     {
-      // TODO: Send heartbeat? or poll data from server idk
+      PUBLISH (utility::event::update);
+      //      api::ws::client::get ()->connect (
+      // "ws://localhost:8765",
+      // api::riot::client::get ()->get_match_guid () + ":"
+      //   + api::riot::client::get ()->get_team (),
+      // api::riot::client::get ()->get_player_guid ());
       std::this_thread::sleep_for (std::chrono::seconds (1));
     }
 

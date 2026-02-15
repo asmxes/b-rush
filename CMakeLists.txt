@@ -23,9 +23,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules
         CACHE STRING "CMake module path" FORCE)
 
 set(CPR_CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 include(FetchContent)
 FetchContent_Declare(cpr GIT_REPOSITORY https://github.com/libcpr/cpr.git
-        GIT_TAG 1.14.1) # Replace with your desired git commit from: https://github.com/libcpr/cpr/releases
+        GIT_TAG 1.14.1)
 FetchContent_MakeAvailable(cpr)
 
 FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
@@ -55,7 +56,6 @@ link_directories(
 #include(cmake_module_name)
 add_subdirectory(imgui)
 
-add_subdirectory(server)
 add_subdirectory(chalkboard)
 add_subdirectory(injector)
 #add_subdirectory(loader)

@@ -18,10 +18,10 @@ public:
     kMAX_LOGGER_LEVEL
   };
 
-  virtual void print (level lvl, const char *func, std::string content);
-  virtual void open (const std::string &dir, level lvl);
-  virtual void close ();
-  virtual const std::string &get_path () const;
+  void print (level lvl, const char *func, std::string content);
+  void open (const std::string &dir, level lvl);
+  void close ();
+  const std::string &get_path () const;
   static logger *get ();
 
 private:

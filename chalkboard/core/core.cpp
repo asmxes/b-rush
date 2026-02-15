@@ -10,6 +10,8 @@
 #include "overlay/hook/hook.hpp"
 #include "overlay/draw/draw.hpp"
 #include "overlay/utility/utility.hpp"
+#include "api/riot/client.hpp"
+#include "api/ws/client.hpp"
 
 float smooth = 8;
 float thickness = 4;
@@ -140,6 +142,7 @@ core::wnd_proc (UINT msg, WPARAM wparam, LPARAM lParam)
 	    {
 	      if (!this->_segments.empty ())
 		this->_segments.clear ();
+	      // TODO: send ws command forerase
 	    }
 	  break;
 	default:
@@ -163,6 +166,29 @@ core::wants_input ()
   // return this->_should_render && this->_draw_mode;
 }
 
+void
+core::update ()
+{
+  auto current_match = api::riot::client::get ()->get_match_guid ();
+  if (_match_id != current_match)
+    {
+      INFO ("Match changed, new: {}, old: {}", _match_id, current_match);
+      api::ws::client::get ()->disconnect ();
+      _segments.clear ();
+
+      _match_id = current_match;
+      if (!_match_id.empty ())
+	{
+	  auto team = api::riot::client::get ()->get_team ();
+	  api::ws::client::get ()->connect (
+	    "ws://localhost:8765", _match_id + ":" + team,
+	    api::riot::client::get ()->get_player_guid ());
+	}
+    }
+
+  // TODO: send ws command for new segments
+}
+
 core::core ()
 {
   this->_should_render = false;
@@ -171,6 +197,7 @@ core::core ()
   this->_segments.clear ();
 
   INFO ("Subscribing to events");
+  SUBSCRIBE (utility::event::id::update, this, &core::render);
   SUBSCRIBE (utility::event::id::render, this, &core::render);
   SUBSCRIBE (utility::event::id::render_menu, this, &core::render_menu);
   SUBSCRIBE (utility::event::id::wnd_proc, this, &core::wnd_proc);
@@ -179,6 +206,7 @@ core::core ()
 core::~core ()
 {
   INFO ("UnSubscribing to events");
+  UNSUBSCRIBE (utility::event::id::update, this);
   UNSUBSCRIBE (utility::event::id::render, this);
   UNSUBSCRIBE (utility::event::id::render_menu, this);
   UNSUBSCRIBE (utility::event::id::wnd_proc, this);

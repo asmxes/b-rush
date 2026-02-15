@@ -10,10 +10,10 @@ class hook
 
 public:
   static hook *get ();
-  virtual ~hook ();
+  ~hook ();
 
-  virtual HWND get_hwnd ();
-  virtual bool is_rendering ();
+  HWND get_hwnd ();
+  bool is_rendering ();
 };
 } // namespace overlay
 #endif
