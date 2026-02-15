@@ -77,12 +77,33 @@ async def handler(ws):
                             "color": peer["color"]
                         }))
 
-            elif msg["type"] == "draw":
+            # elif msg["type"] == "draw":
+            #     await broadcast(room_id, json.dumps({
+            #         "type": "draw",
+            #         "guid": guid,
+            #         "points": msg["points"]
+            #     }), exclude_guid=guid)
+
+            elif msg["type"] == "start_draw":
                 await broadcast(room_id, json.dumps({
-                    "type": "draw",
+                    "type": "start_draw",
                     "guid": guid,
-                    "segment_id": msg["segment_id"],
-                    "points": msg["points"]
+                    "x": msg["x"],
+                    "y": msg["y"]
+                }), exclude_guid=guid)
+
+            elif msg["type"] == "add_point":
+                await broadcast(room_id, json.dumps({
+                    "type": "add_point",
+                    "guid": guid,
+                    "x": msg["x"],
+                    "y": msg["y"]
+                }), exclude_guid=guid)
+
+            elif msg["type"] == "end_draw":
+                await broadcast(room_id, json.dumps({
+                    "type": "end_draw",
+                    "guid": guid
                 }), exclude_guid=guid)
 
             elif msg["type"] == "erase":

@@ -1,19 +1,22 @@
 #ifndef CHALKBOARD_OVERLAY_HOOK_HPP
 #define CHALKBOARD_OVERLAY_HOOK_HPP
 
-#include "core/core.hpp"
+#include <Windows.h>
 
 namespace overlay {
-class hook
-{
-  hook ();
+namespace hook {
 
-public:
-  static hook *get ();
-  ~hook ();
+bool
+install ();
 
-  HWND get_hwnd ();
-  bool is_rendering ();
-};
+void
+uninstall ();
+
+HWND
+get_hwnd ();
+
+bool
+is_rendering ();
+} // namespace hook
 } // namespace overlay
 #endif

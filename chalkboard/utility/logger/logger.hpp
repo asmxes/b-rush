@@ -5,52 +5,46 @@
 #include <fstream>
 #include <format>
 
-class logger
+namespace utility {
+namespace logger {
+enum level
 {
-public:
-  enum level
-  {
-    kTRACE,
-    kDEBUG,
-    kINFO,
-    kWARNING,
-    kERROR,
-    kMAX_LOGGER_LEVEL
-  };
-
-  void print (level lvl, const char *func, std::string content);
-  void open (const std::string &dir, level lvl);
-  void close ();
-  const std::string &get_path () const;
-  static logger *get ();
-
-private:
-  logger () {};
-  ~logger ();
-
-  static std::string make_filename (const std::string &dir);
-  static const char *level_char (level lvl);
-  static std::string time_stamp ();
-
-  level _lvl;
-  std::ofstream _stream;
-  std::string _path;
+  kTRACE,
+  kDEBUG,
+  kINFO,
+  kWARNING,
+  kERROR,
+  kMAX_LOGGER_LEVEL
 };
 
+void
+print (level lvl, const char *func, std::string content);
+
+bool
+open (const std::string &dir, level lvl);
+
+void
+close ();
+
+const std::string &
+get_path ();
+} // namespace logger
+} // namespace utility
+
 #define TRACE(...)                                                             \
-  logger::get ()->print (logger::level::kTRACE, __FUNCTION__,                  \
-			 std::format (__VA_ARGS__))
+  utility::logger::print (utility::logger::level::kTRACE, __FUNCTION__,        \
+			  std::format (__VA_ARGS__))
 #define DEBUG(...)                                                             \
-  logger::get ()->print (logger::level::kDEBUG, __FUNCTION__,                  \
-			 std::format (__VA_ARGS__))
+  utility::logger::print (utility::logger::level::kDEBUG, __FUNCTION__,        \
+			  std::format (__VA_ARGS__))
 #define INFO(...)                                                              \
-  logger::get ()->print (logger::level::kINFO, __FUNCTION__,                   \
-			 std::format (__VA_ARGS__))
+  utility::logger::print (utility::logger::level::kINFO, __FUNCTION__,         \
+			  std::format (__VA_ARGS__))
 #define WARNING(...)                                                           \
-  logger::get ()->print (logger::level::kWARNING, __FUNCTION__,                \
-			 std::format (__VA_ARGS__))
+  utility::logger::print (utility::logger::level::kWARNING, __FUNCTION__,      \
+			  std::format (__VA_ARGS__))
 #define ERROR(...)                                                             \
-  logger::get ()->print (logger::level::kERROR, __FUNCTION__,                  \
-			 std::format (__VA_ARGS__))
+  utility::logger::print (utility::logger::level::kERROR, __FUNCTION__,        \
+			  std::format (__VA_ARGS__))
 
 #endif

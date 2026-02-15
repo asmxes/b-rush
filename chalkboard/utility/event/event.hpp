@@ -18,29 +18,27 @@ enum id
   update,
   render,
   render_menu,
-  wnd_proc
+  wnd_proc,
+  ws_data
 };
 
 struct subscriber
 {
-  ptr owner; // nullptr for free functions, object pointer for methods
-  std::function<void (ptr)> fn;
+  ptr owner{}; // nullptr for free functions, object pointer for methods
+  std::function<void (ptr)> fn{};
 };
 
 class manager
 {
-  std::unordered_map<id, std::vector<subscriber>> _subs;
-
+  std::unordered_map<id, std::vector<subscriber>> _subs{};
   manager () {};
 
 public:
-  static manager *get ();
-
   // free function
   template <typename... Args>
   void subscribe (id event, void (*callback) (Args...))
   {
-    this->_subs[event].emplace_back (
+    _subs[event].emplace_back (
       subscriber{nullptr, [callback] (ptr args) {
 		   auto &tuple = *static_cast<std::tuple<Args...> *> (args);
 		   std::apply (callback, tuple);
@@ -51,7 +49,7 @@ public:
   template <typename T, typename... Args>
   void subscribe (id event, T *object, void (T::*callback) (Args...))
   {
-    this->_subs[event].emplace_back (
+    _subs[event].emplace_back (
       subscriber{static_cast<ptr> (object), [object, callback] (ptr args) {
 		   auto &tuple = *static_cast<std::tuple<Args...> *> (args);
 		   std::apply ([object, callback] (
@@ -59,14 +57,11 @@ public:
 			       tuple);
 		 }});
   }
-
-  void unsubscribe (id event, ptr owner);
-
   template <typename... Args> void dispatch (id event, Args &&...args)
   {
-    auto found = this->_subs.find (event);
+    auto found = _subs.find (event);
 
-    if (found == this->_subs.end ())
+    if (found == _subs.end ())
       return;
 
     auto tuple = std::make_tuple (std::forward<Args> (args)...);
@@ -74,6 +69,9 @@ public:
     for (auto &sub : found->second)
       sub.fn (static_cast<ptr> (&tuple));
   }
+
+  void unsubscribe (id event, ptr owner);
+  static manager *get ();
 };
 
 } // namespace event

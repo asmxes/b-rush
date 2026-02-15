@@ -1,4 +1,4 @@
-#include "client.hpp"
+#include "riot.hpp"
 
 #include "overlay/draw/draw.hpp"
 #include "utility/logger/logger.hpp"
@@ -12,8 +12,20 @@
 namespace api {
 namespace riot {
 
+std::string _lockfile_path{};
+std::string _local_url{};
+std::string _local_auth{};
+std::string _glz_url{};
+std::string _platform_type{};
+std::string _current_version{};
+std::string _region{};
+std::string _access_token{};
+std::string _token{};
+std::string _subject{};
+bool _is_valid{};
+
 std::string
-client::get_current_valorant_version ()
+get_current_valorant_version ()
 {
   auto req = Get (cpr::Url{"https://valorant-api.com/v1/version"},
 		  cpr::VerifySsl{false});
@@ -40,7 +52,7 @@ client::get_current_valorant_version ()
 }
 
 std::string
-client::get_region ()
+get_region ()
 {
   const auto req
     = Get (cpr::Url{std::string (_local_url)
@@ -82,7 +94,7 @@ client::get_region ()
 }
 
 bool
-client::save_online_tokens ()
+save_online_tokens ()
 {
   if (_local_url.empty () || _local_auth.empty ())
     {
@@ -118,7 +130,7 @@ client::save_online_tokens ()
 }
 
 bool
-client::make_online_header (cpr::Header *header)
+make_online_header (cpr::Header *header)
 {
   if (!header || !save_online_tokens () || _current_version.empty ()
       || _platform_type.empty ())
@@ -137,13 +149,13 @@ client::make_online_header (cpr::Header *header)
 }
 
 std::string
-client::get_player_guid ()
+get_player_guid ()
 {
   return save_online_tokens () ? _subject : "";
 }
 
 std::string
-client::get_riot_id ()
+get_riot_id ()
 {
   if (!_is_valid)
     return "";
@@ -174,7 +186,7 @@ client::get_riot_id ()
 }
 
 nlohmann::json
-client::get_match_data ()
+get_match_data ()
 {
   if (!_is_valid)
     {
@@ -204,7 +216,7 @@ client::get_match_data ()
   const auto parsed_json = nlohmann::json::parse (req.text);
   if (!parsed_json.contains ("MatchID"))
     {
-      DEBUG ("Could not find MatchID key: {}", req.text);
+      TRACE ("Could not find MatchID key: {}", req.text);
       return {};
     }
 
@@ -216,9 +228,9 @@ client::get_match_data ()
   if (match_req.error.code != cpr::ErrorCode::OK
       || !nlohmann::json::accept (match_req.text))
     {
-      DEBUG ("Get on '{}' returned: {}, with message: {}, content: {}", url,
-	     static_cast<int> (match_req.error.code), match_req.error.message,
-	     match_req.text);
+      WARNING ("Get on '{}' returned: {}, with message: {}, content: {}", url,
+	       static_cast<int> (match_req.error.code), match_req.error.message,
+	       match_req.text);
       return {};
     }
 
@@ -227,7 +239,7 @@ client::get_match_data ()
 }
 
 std::string
-client::get_match_guid ()
+get_match_guid ()
 {
   auto match_data = get_match_data ();
   if (match_data.empty ())
@@ -251,7 +263,7 @@ client::get_match_guid ()
 }
 
 std::string
-client::get_team ()
+get_team ()
 {
   auto match_data = get_match_data ();
   if (match_data.empty ())
@@ -290,28 +302,29 @@ client::get_team ()
   return team_id;
 }
 
-client::client ()
+bool
+connect ()
 {
   _lockfile_path = std::format (R"({}\Riot Games\Riot Client\Config\lockfile)",
 				getenv ("LOCALAPPDATA"));
   if (!std::filesystem::exists (_lockfile_path))
     {
       ERROR ("No lockfile was found");
-      return;
+      return false;
     }
 
   auto file = utility::read_file (_lockfile_path);
   if (file.empty ())
     {
       ERROR ("Lockfile is empty");
-      return;
+      return false;
     }
 
   auto splitted_file = utility::split_string (file, ':');
   if (splitted_file.size () < 5)
     {
       ERROR ("Lockfile is malformed, content is: {}", file);
-      return;
+      return false;
     }
 
   _local_url = std::format (R"(https://127.0.0.1:{})", splitted_file.at (2));
@@ -322,7 +335,7 @@ client::client ()
   if (_region.empty ())
     {
       ERROR ("No region found");
-      return;
+      return false;
     }
   _glz_url = std::format (R"(https://glz-{}-1.{}.a.pvp.net)", _region, _region);
 
@@ -335,13 +348,7 @@ client::client ()
 
   _current_version = get_current_valorant_version ();
   _is_valid = !_current_version.empty ();
-}
-
-client *
-client::get ()
-{
-  static client obj;
-  return &obj;
+  return true;
 }
 
 } // namespace riot

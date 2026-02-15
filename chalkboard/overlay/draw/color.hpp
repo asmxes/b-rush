@@ -15,7 +15,10 @@ namespace overlay {
 
 struct color
 {
-  u8 _r, _g, _b, _a;
+  u8 _r{};
+  u8 _g{};
+  u8 _b{};
+  u8 _a{};
 
   color () : _r (255), _g (255), _b (255), _a (255) {}
   color (u8 r, u8 g, u8 b, u8 a = 255) : _r (r), _g (g), _b (b), _a (a) {}

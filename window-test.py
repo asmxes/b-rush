@@ -11,7 +11,7 @@ GUID = "viewer-" + str(id(object()))
 BG_COLOR = (20, 20, 30)
 GRID_COLOR = (40, 40, 50)
 
-# peer_guid -> { "color": (r,g,b,a), "segments": { segment_id: [(x,y), ...] } }
+# peer_guid -> { "color": (r,g,b,a), "segments": [[(x,y), ...], ...] }
 peers: dict[str, dict] = {}
 lock = threading.Lock()
 
@@ -38,7 +38,7 @@ async def ws_client():
                     if guid not in peers:
                         peers[guid] = {
                             "color": tuple(msg["color"][:3]),
-                            "segments": {}
+                            "segments": []
                         }
 
                 elif msg["type"] == "draw":
@@ -46,13 +46,27 @@ async def ws_client():
                     if guid not in peers:
                         peers[guid] = {
                             "color": (200, 200, 200),
-                            "segments": {}
+                            "segments": []
                         }
-                    seg_id = msg["segment_id"]
-                    if seg_id not in peers[guid]["segments"]:
-                        peers[guid]["segments"][seg_id] = []
-                    for p in msg["points"]:
-                        peers[guid]["segments"][seg_id].append((p["x"], p["y"]))
+                    points = [(p["x"], p["y"]) for p in msg["points"]]
+                    peers[guid]["segments"].append(points)
+
+                elif msg["type"] == "start_draw":
+                    guid = msg["guid"]
+                    if guid not in peers:
+                        peers[guid] = {
+                            "color": (200, 200, 200),
+                            "segments": []
+                        }
+                    peers[guid]["segments"].append([(msg["x"], msg["y"])])
+
+                elif msg["type"] == "add_point":
+                    guid = msg["guid"]
+                    if guid in peers and peers[guid]["segments"]:
+                        peers[guid]["segments"][-1].append((msg["x"], msg["y"]))
+
+                elif msg["type"] == "end_draw":
+                    pass
 
                 elif msg["type"] == "erase":
                     guid = msg["guid"]
@@ -77,7 +91,6 @@ def main():
     pygame.display.set_caption(f"Viewer - {ROOM}")
     clock = pygame.time.Clock()
 
-    # start websocket in background thread
     def run_ws():
         asyncio.run(ws_client())
 
@@ -95,33 +108,28 @@ def main():
         w, h = screen.get_size()
         screen.fill(BG_COLOR)
 
-        # draw grid
         for x in range(0, w, 50):
             pygame.draw.line(screen, GRID_COLOR, (x, 0), (x, h))
         for y in range(0, h, 50):
             pygame.draw.line(screen, GRID_COLOR, (0, y), (w, y))
 
-        # draw crosshair at center
         cx, cy = w // 2, h // 2
         pygame.draw.line(screen, (60, 60, 70), (cx - 20, cy), (cx + 20, cy))
         pygame.draw.line(screen, (60, 60, 70), (cx, cy - 20), (cx, cy + 20))
 
-        # draw all peer segments
         with lock:
             for guid, peer in peers.items():
                 color = peer["color"]
-                for seg_id, points in peer["segments"].items():
-                    if len(points) < 2:
+                for segment in peer["segments"]:
+                    if len(segment) < 2:
                         continue
                     screen_points = [
-                        normalized_to_screen(p[0], p[1], w, h) for p in points
+                        normalized_to_screen(p[0], p[1], w, h) for p in segment
                     ]
                     pygame.draw.lines(screen, color, False, screen_points, 3)
-                    # draw dots at start and end
                     pygame.draw.circle(screen, color, screen_points[0], 4)
                     pygame.draw.circle(screen, color, screen_points[-1], 4)
 
-        # draw peer list
         with lock:
             y_off = 10
             for guid, peer in peers.items():

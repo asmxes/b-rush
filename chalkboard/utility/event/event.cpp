@@ -3,13 +3,6 @@
 namespace utility {
 namespace event {
 
-manager *
-manager::get ()
-{
-  static manager object{};
-  return &object;
-}
-
 void
 manager::unsubscribe (id event, ptr owner)
 {
@@ -23,6 +16,13 @@ manager::unsubscribe (id event, ptr owner)
 				return s.owner == owner;
 			      }),
 	      subs.end ());
+}
+
+manager *
+manager::get ()
+{
+  static manager object{};
+  return &object;
 }
 
 } // namespace event

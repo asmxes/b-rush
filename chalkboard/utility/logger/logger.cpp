@@ -1,55 +1,16 @@
 #include "logger.hpp"
 #include <Windows.h>
 
-logger::~logger () { this->close (); }
+namespace utility {
 
-void
-logger::print (logger::level lvl, const char *func, std::string content)
-{
-  if (lvl < this->_lvl)
-    return;
+namespace logger {
 
-  if (!this->_stream.is_open ())
-    {
-      MessageBoxA (NULL, "Could not open logging file", "Chalkboard",
-		   MB_OK | MB_ICONERROR);
-      return;
-    }
-
-  this->_stream << "[" << level_char (lvl) << "] [" << time_stamp () << "] ["
-		<< func << "] " << content << std::endl;
-}
-
-void
-logger::open (const std::string &dir, level lvl)
-{
-  this->_path = make_filename (dir);
-  this->_stream.open (this->_path, std::ios::app);
-  this->_lvl = lvl;
-}
-void
-logger::close ()
-{
-  INFO ("Closing logging output");
-  if (this->_stream.is_open ())
-    this->_stream.close ();
-}
-
-const std::string &
-logger::get_path () const
-{
-  return this->_path;
-}
-
-logger *
-logger::get ()
-{
-  static logger object{};
-  return &object;
-}
+level _lvl{};
+std::ofstream _stream{};
+std::string _path{};
 
 std::string
-logger::make_filename (const std::string &dir)
+make_filename (const std::string &dir)
 {
   SYSTEMTIME st;
   GetLocalTime (&st);
@@ -62,26 +23,27 @@ logger::make_filename (const std::string &dir)
 }
 
 const char *
-logger::level_char (logger::level lvl)
+level_char (logger::level lvl)
 {
   switch (lvl)
     {
-    case kTRACE:
+    case logger::level::kTRACE:
       return "T";
-    case kDEBUG:
+    case logger::level::kDEBUG:
       return "D";
-    case kINFO:
+    case logger::level::kINFO:
       return "I";
-    case kWARNING:
+    case logger::level::kWARNING:
       return "W";
-    case kERROR:
+    case logger::level::kERROR:
       return "E";
     default:
       return "?";
     }
 }
+
 std::string
-logger::time_stamp ()
+time_stamp ()
 {
   SYSTEMTIME st;
   GetLocalTime (&st);
@@ -91,3 +53,58 @@ logger::time_stamp ()
 	    st.wSecond, st.wMilliseconds);
   return {buf};
 }
+
+void
+print (logger::level lvl, const char *func, std::string content)
+{
+  if (lvl < _lvl)
+    return;
+
+  if (!_stream.is_open ())
+    {
+#ifdef _DEBUG
+      MessageBoxA (NULL,
+		   std::format ("Could not open logging file, content: {}",
+				content)
+		     .c_str (),
+		   "Chalkboard", MB_OK | MB_ICONERROR);
+#endif
+      return;
+    }
+
+  _stream << "[" << level_char (lvl) << "] [" << time_stamp () << "] [" << func
+	  << "] " << content << std::endl;
+}
+
+bool
+open (const std::string &dir, level lvl)
+{
+  _path = make_filename (dir);
+  _stream.open (_path, std::ios::app);
+  _lvl = lvl;
+
+  if (!_stream.is_open ())
+    MessageBoxA (NULL,
+		 std::format ("Chalkboard failed to save create path for logs "
+			      "on: {}.\nLogs will not be saved.",
+			      dir)
+		   .c_str (),
+		 "Chalkboard", MB_OK | MB_ICONERROR);
+  return _stream.is_open ();
+}
+
+void
+close ()
+{
+  INFO ("Closing logging output");
+  if (_stream.is_open ())
+    _stream.close ();
+}
+
+const std::string &
+get_path ()
+{
+  return _path;
+}
+} // namespace logger
+} // namespace utility

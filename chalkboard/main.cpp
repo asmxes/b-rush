@@ -2,72 +2,88 @@
 #include <thread>
 
 #include "version.hpp"
-#include "api/riot/client.hpp"
 
 #include "utility/logger/logger.hpp"
-#include "core/core.hpp"
+#include "modules/valorant/core.hpp"
 #include "overlay/hook/hook.hpp"
 #include "utility/event/event.hpp"
-#include "api/ws/client.hpp"
 
-std::thread loop_thread;
-HMODULE chalkboard_handle;
+std::thread _loop_thread{};
+HMODULE _chalkboard_handle{};
 
+void
+cleanup ()
+{
+  INFO ("Cleaning up");
+  overlay::hook::uninstall ();
+  core::unload ();
+  utility::logger::close ();
+}
 bool
 execute ()
 {
-  MessageBoxA (NULL, "Hi", "Chalkboard", MB_OK);
+  bool result{true};
 
-  INFO ("Logged in as: {}, GUID: {}", api::riot::client::get ()->get_riot_id (),
-	api::riot::client::get ()->get_player_guid ());
+  utility::logger::open (R"(C:\Users\ry\Desktop)",
+			 utility::logger::level::kTRACE);
+  INFO ("Chalkboard v" PROJECT_VERSION_STR " started");
 
-  auto core_instance = core ();
-  while (overlay::hook::get ()->is_rendering ())
+  if (core::load ())
     {
-      PUBLISH (utility::event::update);
-      //      api::ws::client::get ()->connect (
-      // "ws://localhost:8765",
-      // api::riot::client::get ()->get_match_guid () + ":"
-      //   + api::riot::client::get ()->get_team (),
-      // api::riot::client::get ()->get_player_guid ());
-      std::this_thread::sleep_for (std::chrono::seconds (1));
+      if (overlay::hook::install ())
+	{
+	  // This tells our module to quit,
+	  // cleanup is handled inside
+	  while (overlay::hook::is_rendering ())
+	    {
+	      PUBLISH (utility::event::update);
+	      std::this_thread::sleep_for (std::chrono::seconds (1));
+	    }
+	}
+      else
+	{
+	  ERROR ("Could not install DX11 hook");
+	  result = false;
+	}
+    }
+  else
+    {
+      ERROR ("Could not load core");
+      result = false;
     }
 
-  MessageBoxA (NULL, "Bye", "Chalkboard", MB_OK);
-  return true;
+  INFO ("Quitting");
+  cleanup ();
+  return result;
 }
 
 bool
-thread ()
+try_execute ()
 {
-  bool result;
+  bool result{};
   __try
     {
       result = execute ();
     }
   __except (1)
-    {
-      result = false;
-    }
+    {}
   return result;
 }
 
 void
 entry ()
 {
-  logger::get ()->open (R"(C:\Users\ry\Desktop)", logger::level::kTRACE);
-  INFO ("Chalkboard v" PROJECT_VERSION_STR " started");
-
-  if (!thread ())
-    MessageBoxA (NULL,
-		 std::string ("Chalkboard failed to run.\nLogs are saved on "
-			      + logger::get ()->get_path ()
-			      + ".\nPlease send them to @asmxes on Discord :)")
-		   .c_str (),
-		 "Chalkboard", MB_OK | MB_ICONERROR);
-
-  INFO ("Quitting");
-  FreeLibraryAndExitThread (chalkboard_handle, 0);
+  if (!try_execute ())
+    {
+      MessageBoxA (NULL,
+		   std::string (
+		     "Chalkboard failed to run.\nLogs are saved on "
+		     + utility::logger::get_path ()
+		     + ".\nPlease send them to @asmxes on Discord :)")
+		     .c_str (),
+		   "Chalkboard", MB_OK | MB_ICONERROR);
+    }
+  FreeLibraryAndExitThread (_chalkboard_handle, 0);
 }
 
 BOOL WINAPI
@@ -78,19 +94,19 @@ DllMain (HMODULE hinstDLL,   // handle to DLL module
   switch (fdwReason)
     {
     case DLL_PROCESS_ATTACH:
-      chalkboard_handle = hinstDLL;
-      DisableThreadLibraryCalls (hinstDLL);
+      _chalkboard_handle = hinstDLL;
+      DisableThreadLibraryCalls (_chalkboard_handle);
 
-      loop_thread = std::thread (entry);
-      loop_thread.detach ();
+      _loop_thread = std::thread (entry);
       break;
 
     case DLL_PROCESS_DETACH:
       if (lpvReserved != nullptr)
 	break; // do not do cleanup if process termination scenario
 
-      if (loop_thread.joinable ())
-	loop_thread.join ();
+      cleanup ();
+      if (_loop_thread.joinable ())
+	_loop_thread.join ();
       break;
 
     default:

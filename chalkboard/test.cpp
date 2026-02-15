@@ -1,12 +1,12 @@
-#include "api/riot/client.hpp"
+#include "api/riot.hpp"
 #include "utility/logger/logger.hpp"
-#include "api/ws/client.hpp"
+#include "api/ws/ws.hpp"
 
 int
 main ()
 {
   std::string state;
-  logger::get ()->open (R"(C:\Users\ry\Desktop)", logger::level::kINFO);
+  logger::open (R"(C:\Users\ry\Desktop)", logger::level::kINFO);
 
   api::ws::client::get ()->connect (
     "ws://localhost:8765",

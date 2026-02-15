@@ -18,29 +18,28 @@ ImGui_ImplWin32_WndProcHandler (HWND hWnd, UINT msg, WPARAM wParam,
 				LPARAM lParam);
 
 namespace overlay {
+namespace hook {
 
 void
-hook_impl ();
-void
-unhook_impl ();
+uninstall_impl ();
 
 typedef HRESULT (__stdcall *present_fn) (IDXGISwapChain *, UINT, UINT);
 typedef HRESULT (__stdcall *resize_fn) (IDXGISwapChain *, UINT, UINT, UINT,
 					DXGI_FORMAT, UINT);
 
-present_fn o_present = nullptr;
-resize_fn o_resize = nullptr;
+present_fn _o_present{};
+resize_fn _o_resize{};
 
-ptr swapchain_vtable = nullptr;
-ID3D11Device *d3d_device = nullptr;
-ID3D11DeviceContext *d3d_context = nullptr;
-ID3D11RenderTargetView *render_target_view = nullptr;
-HWND hwnd = nullptr;
-WNDPROC o_wnd_proc = nullptr;
-bool imgui_init = false;
-bool quit_requested = false;
-bool can_quit = false;
-bool is_hooked = false;
+ptr _swapchain_vtable{};
+ID3D11Device *_d3d_device{};
+ID3D11DeviceContext *_d3d_context{};
+ID3D11RenderTargetView *_render_target_view{};
+HWND _hwnd{};
+WNDPROC _o_wnd_proc{};
+bool _is_hooked{};
+bool _imgui_init{};
+bool _quit_requested{};
+bool _can_quit{};
 
 void
 hook_vtable (void **vtable, int index, void *hook_func, void **original_func)
@@ -59,8 +58,8 @@ create_render_target (IDXGISwapChain *swap_chain)
 {
   ID3D11Texture2D *pBackBuffer = nullptr;
   swap_chain->GetBuffer (0, __uuidof (ID3D11Texture2D), (void **) &pBackBuffer);
-  d3d_device->CreateRenderTargetView (pBackBuffer, nullptr,
-				      &render_target_view);
+  _d3d_device->CreateRenderTargetView (pBackBuffer, nullptr,
+				       &_render_target_view);
   pBackBuffer->Release ();
   INFO ("Created RenderTarget object");
 }
@@ -68,10 +67,10 @@ create_render_target (IDXGISwapChain *swap_chain)
 void
 cleanup_render_target ()
 {
-  if (render_target_view)
+  if (_render_target_view)
     {
-      render_target_view->Release ();
-      render_target_view = nullptr;
+      _render_target_view->Release ();
+      _render_target_view = nullptr;
       WARNING ("Cleaned RenderTarget object");
     }
 }
@@ -79,23 +78,18 @@ cleanup_render_target ()
 LRESULT CALLBACK
 wnd_proc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-  // TRACE ("DX11 WNDPROC called, msg: " + std::to_string (msg) + ", wparam: "
-  // + std::to_string (wparam) + ", lparam: " + std::to_string (lparam));
-
-  if (wparam == VK_SHIFT)
+  if (wparam == VK_DELETE)
     {
-      quit_requested = true;
+      INFO ("Quit request by user");
+      _quit_requested = true;
     }
   // TODO: respond to injector challenge
 
   PUBLISH (utility::event::id::wnd_proc, msg, wparam, lparam);
 
-  // if (inst->wants_input ())
-  //   return true;
-
   if (ImGui_ImplWin32_WndProcHandler (hwnd, msg, wparam, lparam))
     return true;
-  return CallWindowProc (o_wnd_proc, hwnd, msg, wparam, lparam);
+  return CallWindowProc (_o_wnd_proc, hwnd, msg, wparam, lparam);
 }
 
 void
@@ -109,28 +103,26 @@ push_imgui_styles ()
 HRESULT __stdcall
 hk_present (IDXGISwapChain *swap_chain, UINT sync_internal, UINT flags)
 {
-  // return o_present (swap_chain, sync_internal, flags);
-
-  if (!imgui_init)
+  if (!_imgui_init)
     {
-      swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
-      swap_chain->GetDevice (__uuidof (ID3D11Device), (void **) &d3d_device);
-      d3d_device->GetImmediateContext (&d3d_context);
+      _swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
+      swap_chain->GetDevice (__uuidof (ID3D11Device), (void **) &_d3d_device);
+      _d3d_device->GetImmediateContext (&_d3d_context);
 
       DXGI_SWAP_CHAIN_DESC sd;
       swap_chain->GetDesc (&sd);
-      hwnd = sd.OutputWindow;
-      o_wnd_proc
-	= (WNDPROC) SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) wnd_proc);
+      _hwnd = sd.OutputWindow;
+      _o_wnd_proc
+	= (WNDPROC) SetWindowLongPtr (_hwnd, GWLP_WNDPROC, (LONG_PTR) wnd_proc);
 
       ImGui::CreateContext ();
-      ImGui_ImplWin32_Init (hwnd);
-      ImGui_ImplDX11_Init (d3d_device, d3d_context);
+      ImGui_ImplWin32_Init (_hwnd);
+      ImGui_ImplDX11_Init (_d3d_device, _d3d_context);
       create_render_target (swap_chain);
 
       push_imgui_styles ();
 
-      imgui_init = true;
+      _imgui_init = true;
       INFO ("Created ImGui context");
     }
 
@@ -160,15 +152,15 @@ hk_present (IDXGISwapChain *swap_chain, UINT sync_internal, UINT flags)
     ImGui::Render ();
   }
 
-  d3d_context->OMSetRenderTargets (1, &render_target_view, nullptr);
+  _d3d_context->OMSetRenderTargets (1, &_render_target_view, nullptr);
   ImGui_ImplDX11_RenderDrawData (ImGui::GetDrawData ());
 
-  auto result = o_present (swap_chain, sync_internal, flags);
+  auto result = _o_present (swap_chain, sync_internal, flags);
 
-  if (quit_requested)
+  if (_quit_requested)
     {
-      unhook_impl ();
-      can_quit = true;
+      uninstall_impl ();
+      _can_quit = true;
     }
 
   return result;
@@ -182,23 +174,36 @@ hk_resize (IDXGISwapChain *swap_chain, UINT buffer_count, UINT w, UINT h,
 
   // return o_resize (swap_chain, buffer_count, w, h, new_format, flags);
 
-  if (imgui_init)
+  if (_imgui_init)
     {
       cleanup_render_target ();
       auto result
-	= o_resize (swap_chain, buffer_count, w, h, new_format, flags);
+	= _o_resize (swap_chain, buffer_count, w, h, new_format, flags);
       create_render_target (swap_chain);
       return result;
     }
 
-  return o_resize (swap_chain, buffer_count, w, h, new_format, flags);
+  return _o_resize (swap_chain, buffer_count, w, h, new_format, flags);
 }
 
-void
-hook_impl ()
+HWND
+get_hwnd ()
 {
-  if (is_hooked)
-    return;
+  return _hwnd;
+}
+
+bool
+is_rendering ()
+{
+  return _imgui_init && _is_hooked && !_can_quit;
+}
+
+bool
+install ()
+{
+  INFO ("Starting overlay");
+  if (_is_hooked)
+    return true;
 
   DXGI_SWAP_CHAIN_DESC scd = {};
   scd.BufferCount = 1;
@@ -231,38 +236,39 @@ hook_impl ()
       std::this_thread::sleep_for (std::chrono::seconds (1));
     }
   if (!swap_chain)
-    return;
+    return false;
 
-  swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
-  hook_vtable (static_cast<void **> (swapchain_vtable), 8,
+  _swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
+  hook_vtable (static_cast<void **> (_swapchain_vtable), 8,
 	       reinterpret_cast<void *> (&hk_present),
-	       reinterpret_cast<void **> (&o_present));
-  hook_vtable (static_cast<void **> (swapchain_vtable), 13,
+	       reinterpret_cast<void **> (&_o_present));
+  hook_vtable (static_cast<void **> (_swapchain_vtable), 13,
 	       reinterpret_cast<void *> (&hk_resize),
-	       reinterpret_cast<void **> (&o_resize));
+	       reinterpret_cast<void **> (&_o_resize));
 
   swap_chain->Release ();
   device->Release ();
   context->Release ();
-  is_hooked = true;
-
-  INFO ("Hooked PresentScene and ResizeBuffers DX11 virtual functions");
+  _is_hooked = true;
+  std::this_thread::sleep_for (std::chrono::milliseconds (100));
+  return true;
 }
 
 void
-unhook_impl ()
+uninstall_impl ()
 {
-  if (!is_hooked)
+  INFO ("Stopping overlay");
+  if (!_is_hooked)
     return;
 
-  hook_vtable (static_cast<void **> (swapchain_vtable), 8,
-	       reinterpret_cast<void *> (o_present), nullptr);
-  hook_vtable (static_cast<void **> (swapchain_vtable), 13,
-	       reinterpret_cast<void *> (o_resize), nullptr);
+  hook_vtable (static_cast<void **> (_swapchain_vtable), 8,
+	       reinterpret_cast<void *> (_o_present), nullptr);
+  hook_vtable (static_cast<void **> (_swapchain_vtable), 13,
+	       reinterpret_cast<void *> (_o_resize), nullptr);
 
-  if (imgui_init)
+  if (_imgui_init)
     {
-      SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) o_wnd_proc);
+      SetWindowLongPtr (_hwnd, GWLP_WNDPROC, (LONG_PTR) _o_wnd_proc);
 
       cleanup_render_target ();
 
@@ -270,55 +276,38 @@ unhook_impl ()
       ImGui_ImplWin32_Shutdown ();
       ImGui::DestroyContext ();
 
-      if (d3d_device)
+      if (_d3d_device)
 	{
-	  d3d_device->Release ();
-	  d3d_device = nullptr;
+	  _d3d_device->Release ();
+	  _d3d_device = nullptr;
 	}
-      if (d3d_context)
+      if (_d3d_context)
 	{
-	  d3d_context->ClearState ();
-	  d3d_context->Flush ();
-	  d3d_context->Release ();
-	  d3d_context = nullptr;
+	  _d3d_context->ClearState ();
+	  _d3d_context->Flush ();
+	  _d3d_context->Release ();
+	  _d3d_context = nullptr;
 	}
-      imgui_init = false;
+      _imgui_init = false;
       INFO ("UnInitialized ImGui and DirectX objects");
     }
 
-  is_hooked = false;
+  _is_hooked = false;
   INFO ("UnHooked PresentScene and ResizeBuffers DX11 virtual functions");
 }
 
-HWND
-hook::get_hwnd ()
+void
+uninstall ()
 {
-  return hwnd;
+  TRACE ("Requested overlay unhook");
+  while (is_rendering ())
+    {
+      _quit_requested = true;
+      std::this_thread::sleep_for (std::chrono::milliseconds (100));
+    }
+  TRACE ("Completed overlay unhook");
 }
 
-bool
-hook::is_rendering ()
-{
-  return !can_quit;
-}
-
-hook::hook ()
-{
-  INFO ("Starting overlay");
-  hook_impl ();
-}
-
-hook::~hook ()
-{
-  INFO ("Unhooking and destroying overlay");
-  unhook_impl ();
-}
-
-hook *
-hook::get ()
-{
-  static hook instance;
-  return &instance;
-}
+} // namespace hook
 
 } // namespace overlay

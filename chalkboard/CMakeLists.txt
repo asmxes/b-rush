@@ -2,18 +2,20 @@ set(TARGET_NAME chalkboard)
 
 set(SOURCES
         main.cpp
-        utility/event/event.cpp
+
         overlay/hook/hook.cpp
         overlay/draw/draw.cpp
         overlay/utility/utility.cpp
+
+        utility/event/event.cpp
         utility/logger/logger.cpp
         utility/input/input.cpp
         utility/generic.cpp
 
-        api/riot/client.cpp
-        api/ws/client.cpp
+        api/riot.cpp
+        api/ws.cpp
 
-        core/core.cpp
+        modules/valorant/core.cpp
 )
 add_library(${TARGET_NAME} SHARED ${SOURCES})
 sign_executable(${TARGET_NAME})
