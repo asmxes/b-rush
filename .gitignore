@@ -2,6 +2,9 @@
 /.vscode
 /.idea
 /.venv
-/version.hpp
 
+/bin
 /cmake-build*
+
+/version.hpp
+/version.txt

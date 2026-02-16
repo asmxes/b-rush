@@ -2,7 +2,9 @@ set(TARGET_NAME injector)
 
 
 add_executable(${TARGET_NAME} main.cpp)
-sign_executable(${TARGET_NAME})
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    sign_executable(${TARGET_NAME})
+endif ()
 
 # add_library(${TARGET_NAME} SHARED ${SOURCES})
 # add_library(${TARGET_NAME} STATIC ${SOURCES})
