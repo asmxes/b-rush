@@ -17,6 +17,9 @@ get_hwnd ();
 
 bool
 is_rendering ();
+
+bool
+is_installed ();
 } // namespace hook
 } // namespace overlay
 #endif

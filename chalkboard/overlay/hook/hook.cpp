@@ -7,7 +7,7 @@
 #include "imgui/imgui_impl_win32.h"
 
 #include "overlay/draw/draw.hpp"
-#include "utility/logger/logger.hpp"
+#include "shared/logger/logger.hpp"
 #include "utility/event/event.hpp"
 
 #include <chrono>
@@ -61,7 +61,7 @@ create_render_target (IDXGISwapChain *swap_chain)
   _d3d_device->CreateRenderTargetView (pBackBuffer, nullptr,
 				       &_render_target_view);
   pBackBuffer->Release ();
-  INFO ("Created RenderTarget object");
+  TRACE ("Created RenderTarget object");
 }
 
 void
@@ -115,13 +115,11 @@ hk_present (IDXGISwapChain *swap_chain, UINT sync_internal, UINT flags)
       _swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
       swap_chain->GetDevice (__uuidof (ID3D11Device), (void **) &_d3d_device);
       _d3d_device->GetImmediateContext (&_d3d_context);
-
       DXGI_SWAP_CHAIN_DESC sd;
       swap_chain->GetDesc (&sd);
       _hwnd = sd.OutputWindow;
       _o_wnd_proc
 	= (WNDPROC) SetWindowLongPtr (_hwnd, GWLP_WNDPROC, (LONG_PTR) wnd_proc);
-
       ImGui::CreateContext ();
       ImGui_ImplWin32_Init (_hwnd);
       ImGui_ImplDX11_Init (_d3d_device, _d3d_context);
@@ -202,7 +200,15 @@ get_hwnd ()
 bool
 is_rendering ()
 {
+  TRACE ("Checking");
   return _imgui_init && _is_hooked && !_can_quit;
+}
+
+bool
+is_installed ()
+{
+  TRACE ("Checking");
+  return _is_hooked & !_can_quit;
 }
 
 bool
@@ -235,6 +241,7 @@ install ()
 					 D3D11_SDK_VERSION, &scd, &swap_chain,
 					 &device, &featureLevel, &context);
 
+      TRACE ("D3D11CreateDeviceAndSwapChain returned: {}", result);
       if (SUCCEEDED (result))
 	break;
 
@@ -242,16 +249,21 @@ install ()
 	       result);
       std::this_thread::sleep_for (std::chrono::seconds (1));
     }
+
   if (!swap_chain)
     return false;
 
   _swapchain_vtable = *reinterpret_cast<uintptr_t **> (swap_chain);
+  TRACE ("Swapchain VTABLE: {}", _swapchain_vtable);
+
   hook_vtable (static_cast<void **> (_swapchain_vtable), 8,
 	       reinterpret_cast<void *> (&hk_present),
 	       reinterpret_cast<void **> (&_o_present));
+  TRACE ("Hooked present");
   hook_vtable (static_cast<void **> (_swapchain_vtable), 13,
 	       reinterpret_cast<void *> (&hk_resize),
 	       reinterpret_cast<void **> (&_o_resize));
+  TRACE ("Hooked resize");
 
   swap_chain->Release ();
   device->Release ();
@@ -264,7 +276,7 @@ install ()
 void
 uninstall_impl ()
 {
-  INFO ("Stopping overlay");
+  TRACE ("Called");
   if (!_is_hooked)
     return;
 
@@ -307,8 +319,16 @@ void
 uninstall ()
 {
   TRACE ("Requested overlay unhook");
+
+  if (!is_rendering ())
+    {
+      TRACE ("Called while overlay is not rendering");
+      uninstall_impl ();
+    }
+
   while (is_rendering ())
     {
+      TRACE ("Overlay is rendering, waiting for automatic unhook...");
       _quit_requested = true;
       std::this_thread::sleep_for (std::chrono::milliseconds (100));
     }

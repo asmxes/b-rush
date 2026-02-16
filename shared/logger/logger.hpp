@@ -1,11 +1,10 @@
-#ifndef CHALKBOARD_LOGGER_HPP
-#define CHALKBOARD_LOGGER_HPP
+#ifndef SHARED_LOGGER_HPP
+#define SHARED_LOGGER_HPP
 
 #include <string>
 #include <fstream>
 #include <format>
 
-namespace utility {
 namespace logger {
 enum level
 {
@@ -21,7 +20,11 @@ void
 print (level lvl, const char *func, std::string content);
 
 bool
-open (const std::string &dir, level lvl);
+open (const std::string &dir, const std::string &file, level lvl);
+
+bool
+open (const std::string &dir, const std::string &file,
+      const std::string &lvl_str);
 
 void
 close ();
@@ -29,22 +32,17 @@ close ();
 const std::string &
 get_path ();
 } // namespace logger
-} // namespace utility
 
 #define TRACE(...)                                                             \
-  utility::logger::print (utility::logger::level::kTRACE, __FUNCTION__,        \
-			  std::format (__VA_ARGS__))
+  logger::print (logger::level::kTRACE, __FUNCTION__, std::format (__VA_ARGS__))
 #define DEBUG(...)                                                             \
-  utility::logger::print (utility::logger::level::kDEBUG, __FUNCTION__,        \
-			  std::format (__VA_ARGS__))
+  logger::print (logger::level::kDEBUG, __FUNCTION__, std::format (__VA_ARGS__))
 #define INFO(...)                                                              \
-  utility::logger::print (utility::logger::level::kINFO, __FUNCTION__,         \
-			  std::format (__VA_ARGS__))
+  logger::print (logger::level::kINFO, __FUNCTION__, std::format (__VA_ARGS__))
 #define WARNING(...)                                                           \
-  utility::logger::print (utility::logger::level::kWARNING, __FUNCTION__,      \
-			  std::format (__VA_ARGS__))
+  logger::print (logger::level::kWARNING, __FUNCTION__,                        \
+		 std::format (__VA_ARGS__))
 #define ERROR(...)                                                             \
-  utility::logger::print (utility::logger::level::kERROR, __FUNCTION__,        \
-			  std::format (__VA_ARGS__))
+  logger::print (logger::level::kERROR, __FUNCTION__, std::format (__VA_ARGS__))
 
 #endif

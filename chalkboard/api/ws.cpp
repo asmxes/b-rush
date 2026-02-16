@@ -1,7 +1,7 @@
 #include "ws.hpp"
 
 #include "utility/event/event.hpp"
-#include "utility/logger/logger.hpp"
+#include "shared/logger/logger.hpp"
 
 namespace api {
 namespace ws {
@@ -42,23 +42,32 @@ connect (const std::string &uri, const std::string &room,
   _guid = "debug-client";
 
 #else
-
   if (room.size () < 3)
-    return;
+    return false;
 
   std::string host_str = uri;
-  _room = "";
+  _room = room;
   _guid = guid;
 
 #endif
 
-  INFO ("Connecting to websocket\nuri: {}\nroom: {}", uri, room);
+  INFO ("Connecting to websocket\nuri: {}\nroom: {}", host_str, _room);
   _running = true;
 
   int port = 80;
 
-  if (host_str.find ("ws://") == 0)
-    host_str = host_str.substr (5);
+  bool secure = false;
+
+  if (host_str.find ("wss://") == 0)
+    {
+      host_str = host_str.substr (6);
+      secure = true;
+      port = 443;
+    }
+  else if (host_str.find ("ws://") == 0)
+    {
+      host_str = host_str.substr (5);
+    }
 
   auto colon = host_str.find (':');
   if (colon != std::string::npos)
@@ -96,7 +105,8 @@ connect (const std::string &uri, const std::string &room,
 
   HINTERNET request
     = WinHttpOpenRequest (connect, L"GET", L"/", nullptr, WINHTTP_NO_REFERER,
-			  WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
+			  WINHTTP_DEFAULT_ACCEPT_TYPES,
+			  secure ? WINHTTP_FLAG_SECURE : 0);
   if (!request)
     {
       ERROR ("Could not open request, error: {}", GetLastError ());

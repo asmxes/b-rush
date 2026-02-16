@@ -1,7 +1,6 @@
 #include "logger.hpp"
 #include <Windows.h>
-
-namespace utility {
+#include <filesystem>
 
 namespace logger {
 
@@ -10,13 +9,14 @@ std::ofstream _stream{};
 std::string _path{};
 
 std::string
-make_filename (const std::string &dir)
+make_filename (const std::string &dir, const std::string &file)
 {
   SYSTEMTIME st;
   GetLocalTime (&st);
 
   char buf[64];
-  snprintf (buf, sizeof (buf), "chalkboard-%02d%02d%02d.log", st.wDay,
+  snprintf (buf, sizeof (buf),
+	    std::string (file + "-%02d%02d%02d.log").c_str (), st.wDay,
 	    st.wMonth, st.wYear % 100);
 
   return dir + "\\" + buf;
@@ -77,9 +77,14 @@ print (logger::level lvl, const char *func, std::string content)
 }
 
 bool
-open (const std::string &dir, level lvl)
+open (const std::string &dir, const std::string &file, level lvl)
 {
-  _path = make_filename (dir);
+  char expanded[MAX_PATH];
+  ExpandEnvironmentStringsA (dir.c_str (), expanded, MAX_PATH);
+
+  std::filesystem::create_directories (expanded);
+
+  _path = make_filename (expanded, file);
   _stream.open (_path, std::ios::app);
   _lvl = lvl;
 
@@ -91,6 +96,27 @@ open (const std::string &dir, level lvl)
 		   .c_str (),
 		 "Chalkboard", MB_OK | MB_ICONERROR);
   return _stream.is_open ();
+}
+
+bool
+open (const std::string &dir, const std::string &file,
+      const std::string &lvl_str)
+{
+  level lvl{};
+  if (lvl_str == "TRACE")
+    lvl = logger::level::kTRACE;
+  else if (lvl_str == "DEBUG")
+    lvl = logger::level::kDEBUG;
+  else if (lvl_str == "INFO")
+    lvl = logger::level::kINFO;
+  else if (lvl_str == "WARNING")
+    lvl = logger::level::kWARNING;
+  else if (lvl_str == "ERROR")
+    lvl = logger::level::kERROR;
+  else
+    lvl = logger::level::kINFO;
+
+  return open (dir, file, lvl);
 }
 
 void
@@ -107,4 +133,3 @@ get_path ()
   return _path;
 }
 } // namespace logger
-} // namespace utility

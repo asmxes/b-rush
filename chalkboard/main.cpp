@@ -3,10 +3,12 @@
 
 #include "version.hpp"
 
-#include "utility/logger/logger.hpp"
+#include "shared/logger/logger.hpp"
 #include "modules/valorant/core.hpp"
 #include "overlay/hook/hook.hpp"
 #include "utility/event/event.hpp"
+
+#include "shared/config/config.hpp"
 
 std::thread _loop_thread{};
 HMODULE _chalkboard_handle{};
@@ -17,15 +19,15 @@ cleanup ()
   INFO ("Cleaning up");
   overlay::hook::uninstall ();
   core::unload ();
-  utility::logger::close ();
+  logger::close ();
 }
 bool
 execute ()
 {
   bool result{true};
 
-  utility::logger::open (R"(C:\Users\ry\Desktop)",
-			 utility::logger::level::kTRACE);
+  logger::open (R"(%APPDATA%\b-rush\logs)", "chalkboard",
+		config::get ("LOG_LEVEL", config::defaults::kLOG_LEVEL));
   INFO ("Chalkboard v" PROJECT_VERSION_STR " started");
 
   if (core::load ())
@@ -34,8 +36,9 @@ execute ()
 	{
 	  // This tells our module to quit,
 	  // cleanup is handled inside
-	  while (overlay::hook::is_rendering ())
+	  while (overlay::hook::is_installed ())
 	    {
+	      TRACE ("Publishing update event");
 	      PUBLISH (utility::event::update);
 	      std::this_thread::sleep_for (std::chrono::seconds (1));
 	    }
@@ -66,7 +69,11 @@ try_execute ()
       result = execute ();
     }
   __except (1)
-    {}
+    {
+#ifdef _DEBUG
+      MessageBoxA (nullptr, "SEH", "Chalkboard", MB_OK | MB_ICONERROR);
+#endif
+    }
   return result;
 }
 
@@ -78,7 +85,7 @@ entry ()
       MessageBoxA (NULL,
 		   std::string (
 		     "Chalkboard failed to run.\nLogs are saved on "
-		     + utility::logger::get_path ()
+		     + logger::get_path ()
 		     + ".\nPlease send them to @asmxes on Discord :)")
 		     .c_str (),
 		   "Chalkboard", MB_OK | MB_ICONERROR);

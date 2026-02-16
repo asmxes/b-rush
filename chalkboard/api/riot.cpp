@@ -1,7 +1,7 @@
 #include "riot.hpp"
 
 #include "overlay/draw/draw.hpp"
-#include "utility/logger/logger.hpp"
+#include "shared/logger/logger.hpp"
 
 #include <format>
 #include <filesystem>

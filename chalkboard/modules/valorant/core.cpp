@@ -3,7 +3,7 @@
 #include <chrono>
 #include <windowsx.h>
 
-#include "utility/logger/logger.hpp"
+#include "shared/logger/logger.hpp"
 #include "utility/event/event.hpp"
 #include "utility/input/input.hpp"
 
@@ -12,6 +12,9 @@
 #include "overlay/utility/utility.hpp"
 #include "api/riot.hpp"
 #include "api/ws.hpp"
+#include "config/config.hpp"
+
+#include "version.hpp"
 
 namespace core {
 
@@ -31,11 +34,13 @@ bool _should_render{};
 bool _draw_mode{};
 bool _mouse_down{};
 std::string _match_id{};
+std::string _room_override{};
 
 float _smooth{4};
 float _thickness{4};
-float _colorf[4]{1, 1, 1, 1};
 overlay::color _color{};
+
+// Used to draw colors under agent potrait
 ImVec2 _start{-0.131, -0.42}, end{-0.108, -0.41};
 float _offsets[]{0, -0.034, -0.069, -0.1025, -0.137};
 
@@ -146,13 +151,37 @@ on_render ()
 void
 on_render_menu ()
 {
-  ImGui::Begin ("Chalkboard", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+  auto start_pos = overlay::utility::normalized_to_screen ({-0.492, -0.450});
+  overlay::draw::text (start_pos, "b-rush v" PROJECT_VERSION_STR, false, false,
+		       overlay::color ("#ffffff44"));
+  if (_match_id.empty ())
+    {
+      overlay::draw::text ({start_pos.x, start_pos.y + 10},
+			   "Waiting for match...", false, false,
+			   overlay::color ("#ffff00"));
+    }
+  else
+    {
+      auto text = _room_override.empty () ? "match room" : "override room";
+      overlay::draw::text ({start_pos.x, start_pos.y + 10},
+			   std::format ("Connected to {}", text).c_str (),
+			   false, false, overlay::color ("#00ff00"));
+    }
+
+#ifdef _DEBUG
+  ImGui::Begin ("Debug");
   {
-    ImGui::SliderFloat ("Smooth", &_smooth, 1.0f, 20.0f);
-    ImGui::SliderFloat ("Thickness", &_thickness, 0.0f, 10.0f);
-    ImGui::ColorEdit4 ("Color", _colorf, ImGuiColorEditFlags_AlphaBar);
+    ImGui::Text (std::format ("match id: {}", _match_id).c_str ());
+    ImGui::Text (std::format ("room override: {}", _room_override).c_str ());
+    for (auto &peer : _peers)
+      {
+	ImGui::Text (std::format ("peer: {}, color: {}", peer.first,
+				  std::string (peer.second.color))
+		       .c_str ());
+      }
   }
   ImGui::End ();
+#endif
 }
 
 void
@@ -225,8 +254,10 @@ on_update ()
       if (!_match_id.empty ())
 	{
 	  auto team = api::riot::get_team ();
-	  api::ws::connect ("ws.b-rush.com", _match_id + ":" + team,
-			    api::riot::get_player_guid ());
+	  auto room
+	    = _room_override.empty () ? _match_id + ":" + team : _room_override;
+	  api::ws::connect (config::get ("WS_URI", config::defaults::kWS_URI),
+			    room, api::riot::get_player_guid ());
 	}
     }
 
@@ -349,8 +380,8 @@ load ()
   INFO ("Logged in as: {}, GUID: {}", api::riot::get_riot_id (),
 	api::riot::get_player_guid ());
 
-  if (!api::ws::connect ("ws.b-rush.com", "heart:beat",
-			 api::riot::get_player_guid ()))
+  if (!api::ws::connect (config::get ("WS_URI", config::defaults::kWS_URI),
+			 "heart:beat", api::riot::get_player_guid ()))
     {
       ERROR ("Could not connect to ws");
       return false;
@@ -359,6 +390,13 @@ load ()
   // We dont care about the heartbeat connect, we use it only to make sure the
   // server is available
   api::ws::disconnect ();
+
+  _room_override
+    = config::get ("ROOM_OVERRIDE", config::defaults::kROOM_OVERRIDE);
+  if (!_room_override.empty ())
+    {
+      INFO ("Room override: {}", _room_override);
+    }
 
   SUBSCRIBE (utility::event::id::update, &core::on_update);
   SUBSCRIBE (utility::event::id::render, &core::on_render);

@@ -1,21 +1,17 @@
 #include "api/riot.hpp"
-#include "utility/logger/logger.hpp"
-#include "api/ws/ws.hpp"
+#include "shared/logger/logger.hpp"
+#include "api/ws.hpp"
+#include "shared/config/config.hpp"
 
 int
 main ()
 {
-  std::string state;
-  logger::open (R"(C:\Users\ry\Desktop)", logger::level::kINFO);
-
-  api::ws::client::get ()->connect (
-    "ws://localhost:8765",
-    api::riot::client::get ()->get_match_guid () + ":"
-      + api::riot::client::get ()->get_team (),
-    api::riot::client::get ()->get_player_guid ());
+  logger::open (R"(%APPDATA%\b-rush\logs)", "chalkboard-test",
+              config::get ("LOG_LEVEL", config::defaults::kLOG_LEVEL));
 
   while (1)
     {
+      TRACE("HIII");
       std::this_thread::sleep_for (std::chrono::seconds (2));
     }
 }

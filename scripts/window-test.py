@@ -5,7 +5,8 @@ import threading
 import pygame
 
 SERVER_URL = "ws://localhost:8765"
-ROOM = sys.argv[1] if len(sys.argv) > 1 else "test:Blue"
+# SERVER_URL = "wss://ws.b-rush.it"
+ROOM = sys.argv[1] if len(sys.argv) > 1 else "debug-client"
 GUID = "viewer-" + str(id(object()))
 
 BG_COLOR = (20, 20, 30)

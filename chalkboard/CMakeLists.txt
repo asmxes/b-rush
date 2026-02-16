@@ -8,7 +8,6 @@ set(SOURCES
         overlay/utility/utility.cpp
 
         utility/event/event.cpp
-        utility/logger/logger.cpp
         utility/input/input.cpp
         utility/generic.cpp
 
@@ -16,6 +15,10 @@ set(SOURCES
         api/ws.cpp
 
         modules/valorant/core.cpp
+
+        ${PROJECT_SOURCE_DIR}/shared/logger/logger.cpp
+        ${PROJECT_SOURCE_DIR}/shared/config/config.cpp
+
 )
 add_library(${TARGET_NAME} SHARED ${SOURCES})
 sign_executable(${TARGET_NAME})

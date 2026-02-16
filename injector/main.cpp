@@ -45,7 +45,8 @@ main (int argc, char *argv[], char *envp[])
   auto addr = (HOOKPROC) GetProcAddress (
     dll,
     "dummy_debug_proc"); // export see dllmain.cpp "C" __declspec(dllexport) int
-			 // NextHook(int code, WPARAM wParam, LPARAM lParam)
+			 // dummy_debug_proc(int code, WPARAM wParam, LPARAM
+			 // lParam)
   if (addr == NULL)
     {
       cerr << "[ FAILED ] The function was not found." << endl;
