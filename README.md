@@ -9,6 +9,8 @@ your team in real time.
 
 ---
 
+https://github.com/user-attachments/assets/e07a70d8-58d4-4fe4-8b38-dfe2521f8901
+
 ## ⚠️ Early Access
 
 This is a **testing release** — the goal is to catch crashes, lag, and edge cases before a wider rollout.
